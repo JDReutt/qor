@@ -66,6 +66,8 @@ function adminTasks() {
 
   gulp.task('js', ['qor'], function () {
     return gulp.src(scripts.src)
+    .pipe(eslint({configFile: '.eslintrc'}))
+    .pipe(eslint.format())
     .pipe(plugins.concat('app.js'))
     .pipe(plugins.uglify())
     .pipe(gulp.dest(scripts.dest));
@@ -74,7 +76,10 @@ function adminTasks() {
   gulp.task('qor+', function () {
     return gulp.src([scripts.qorInit,scripts.qor])
     .pipe(plugins.sourcemaps.init())
+    .pipe(eslint({configFile: '.eslintrc'}))
+    .pipe(eslint.format())
     .pipe(plugins.concat('qor.js'))
+    .pipe(plugins.uglify())
     .pipe(plugins.sourcemaps.write('./'))
     .pipe(gulp.dest(scripts.dest));
   });
@@ -83,6 +88,7 @@ function adminTasks() {
     return gulp.src(scripts.src)
     .pipe(plugins.sourcemaps.init())
     .pipe(plugins.concat('app.js'))
+    .pipe(plugins.uglify())
     .pipe(plugins.sourcemaps.write('./'))
     .pipe(gulp.dest(scripts.dest));
   });
@@ -95,13 +101,7 @@ function adminTasks() {
     .pipe(gulp.dest(styles.dest));
   });
 
-  gulp.task('csslint', ['sass'], function () {
-    return gulp.src(styles.main)
-    .pipe(plugins.csslint('.csslintrc'))
-    .pipe(plugins.csslint.reporter());
-  });
-
-  gulp.task('css', ['csslint'], function () {
+  gulp.task('css', ['sass'], function () {
     return gulp.src(styles.main)
     .pipe(plugins.autoprefixer())
     .pipe(plugins.csscomb())
@@ -112,7 +112,7 @@ function adminTasks() {
   gulp.task('watch', function () {
     gulp.watch(scripts.qor, ['qor+']);
     gulp.watch(scripts.src, ['js+']);
-    gulp.watch(styles.scss, ['sass']);
+    gulp.watch(styles.scss, ['css']);
   });
 
   gulp.task('release', ['js', 'css']);
@@ -121,10 +121,26 @@ function adminTasks() {
 }
 
 
+// -----------------------------------------------------------------------------
 // Other Modules
 // Command: gulp [task] --moduleName--subModuleName
+//
+//  example:
 // Watch Worker module: gulp --worker
-// Watch Worker inline_edit subModule: gulp --worker--inline_edit
+//
+// if module's assets just like normal path:
+// moduleName/views/themes/moduleName/assets/javascripts(stylesheets)
+// just use gulp --worker
+//
+// if module's assets path like Admin module:
+// moduleName/views/assets/javascripts(stylesheets)
+// you need set subModuleName as admin
+// gulp --worker--admin
+//
+// if you need run task for subModule in modules
+// example: worker module inline_edit subModule:
+// gulp --worker--inline_edit
+//
 // -----------------------------------------------------------------------------
 
 function moduleTasks(moduleNames) {
@@ -133,7 +149,12 @@ function moduleTasks(moduleNames) {
 
   var pathto = function (file) {
     if(moduleName && subModuleName) {
-      return '../' + moduleName + '/' + subModuleName + '/views/themes/' + moduleName + '/assets/' + file;
+      if(subModuleName == 'admin') {
+        return '../' + moduleName + '/views/assets/' + file;
+      } else {
+        return '../' + moduleName + '/' + subModuleName + '/views/themes/' + moduleName + '/assets/' + file;
+      }
+
     }
     return '../' + moduleName + '/views/themes/' + moduleName + '/assets/' + file;
   };
@@ -154,7 +175,7 @@ function moduleTasks(moduleNames) {
   }
 
 
-  gulp.task('concat', function () {
+  gulp.task('js', function () {
     var scriptPath = scripts.src;
     var folders = getFolders(scriptPath);
     var task = folders.map(function(folder){
@@ -194,11 +215,12 @@ function moduleTasks(moduleNames) {
   });
 
   gulp.task('watch', function () {
-    gulp.watch(scripts.watch, ['concat']);
+    gulp.watch(scripts.watch, ['js']);
     gulp.watch(styles.watch, ['css']);
   });
 
   gulp.task('default', ['watch']);
+  gulp.task('release', ['js', 'css']);
 }
 
 
@@ -206,16 +228,22 @@ function moduleTasks(moduleNames) {
 // -----------------------------------------------------------------------------
 
 if (moduleName.name) {
-  var runModuleName = 'Running "' + moduleName.name + '" module task...';
+  var taskPath = moduleName.name + '/views/themes/' + moduleName.name + '/assets/';
+  var runModuleName = 'Running "' + moduleName.name + '" module task in "' + taskPath + '"...';
 
   if (moduleName.subName){
-    runModuleName = 'Running "' + moduleName.name + ' > ' + moduleName.subName + '" module task...';
+    if (moduleName.subName == 'admin'){
+      taskPath = moduleName.name + '/views/assets/';
+      runModuleName = 'Running "' + moduleName.name + '" module task in "' + taskPath + '"...';
+    } else {
+      taskPath = moduleName.name + '/' + moduleName.subName + '/views/themes/' + moduleName.name + '/assets/';
+      runModuleName = 'Running "' + moduleName.name + ' > ' + moduleName.subName + '" module task in "' + taskPath + '"...';
+    }
   }
-
   console.log(runModuleName);
   moduleTasks(moduleName);
 } else {
-  console.log('Running "admin" module task...');
+  console.log('Running "admin" module task in "admin/views/assets/"...');
   adminTasks();
 }
 
